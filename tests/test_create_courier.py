@@ -18,7 +18,7 @@ class TestCourierCreation:
         payload = {
             "login": login,
             "password": password,
-            "firstName": first_name  # Добавлен firstName для полноты данных
+            "firstName": first_name
         }
 
         with allure.step('Попытка создать существующего курьера'):
@@ -30,28 +30,35 @@ class TestCourierCreation:
         with allure.step('Проверка сообщения об ошибке'):
             assert response.json().get('message') == "Этот логин уже используется. Попробуйте другой."
 
-
     @allure.title('Для создания курьера необходимы все обязательные поля')
     @allure.description('Проверяем, что без обязательных полей login, password или firstName курьер не создается')
-    @pytest.mark.parametrize("payload", [
-        {"password": "test_password", "firstName": "test_name"},  # Нет login
-        {"login": "test_login", "firstName": "test_name"},      # Нет password
-        {"login": "test_login", "password": "test_password"}   # Нет firstName
+    @pytest.mark.parametrize("missing_field, expected_message", [
+        ("login", "Недостаточно данных для создания учетной записи"),
+        ("password", "Недостаточно данных для создания учетной записи"),
+        ("firstName", "Недостаточно данных для создания учетной записи"),
     ])
-    def test_create_courier_missing_required_fields_fails(self, payload):
+    def test_create_courier_missing_required_fields_fails(self, missing_field, expected_message):
         generator = CourierGenerator()
-        if "login" not in payload:
-            payload["login"] = generator.generate_random_string(10)
-        if "password" not in payload:
-            payload["password"] = generator.generate_random_string(10)
+        login = generator.generate_random_string(10)
+        password = generator.generate_random_string(10)
+        first_name = generator.generate_random_string(10)
 
-        with allure.step(f'Попытка создать курьера с неполными данными: {payload}'):
+        payload = {
+            "login": login,
+            "password": password,
+            "firstName": first_name
+        }
+
+        # Удаляем поле, которое, как ожидается, отсутствует
+        del payload[missing_field]
+
+        with allure.step(f'Попытка создать курьера без поля {missing_field}'):
             response = requests.post(CREATE_COURIER, data=payload)
 
         with allure.step('Проверка статуса ответа на неполные данные'):
             assert response.status_code == 400
         with allure.step('Проверка сообщения об ошибке'):
-            assert response.json().get('message') == "Недостаточно данных для создания учетной записи"
+            assert response.json().get('message') == expected_message
 
     @allure.title('Успешный запрос создания курьера возвращает {"ok":true}')
     @allure.description('Проверяем содержание ответа при успешном создании курьера')
