@@ -1,4 +1,3 @@
-
 import requests
 import allure
 import pytest
@@ -8,9 +7,9 @@ from endpoints import CREATE_COURIER, LOGIN_COURIER, DELETE_COURIER
 @allure.suite('API Курьер')
 class TestCourierCreation:
 
-    @allure.title('Успешное создание курьера')
-    @allure.description('Проверяем, что нового курьера можно создать с корректными данными')
-    def test_create_courier_success(self, register_and_delete_courier):
+    @allure.title('Успешный логин курьера')
+    @allure.description('Проверяем, что уже созданного курьера можно успешно залогинить')
+    def test_login_courier_success(self, register_and_delete_courier):
         login = register_and_delete_courier['login']
         password = register_and_delete_courier['password']
 
@@ -32,12 +31,12 @@ class TestCourierCreation:
         login = register_and_delete_courier['login']
         password = register_and_delete_courier['password']
 
-        with allure.step('Попытка создать курьера'):
-            duplicate_payload = {
-                "login": login,
-                "password": password,
-                "firstName": "new_name"
-            }
+        duplicate_payload = {
+            "login": login,
+            "password": password,
+            "firstName": "new_name" 
+        }
+        with allure.step('Попытка создать курьера с уже существующим логином'):
             response = requests.post(CREATE_COURIER, data=duplicate_payload)
 
         with allure.step('Проверка статуса ответа на создание дубликата'):
@@ -45,36 +44,41 @@ class TestCourierCreation:
         with allure.step('Проверка сообщения об ошибке'):
             assert response.json().get('message') == "Этот логин уже используется. Попробуйте другой."
 
+
     @allure.title('Для создания курьера необходимы все обязательные поля')
     @allure.description('Проверяем, что без обязательных полей login, password или firstName курьер не создается')
     @allure.severity(allure.severity_level.CRITICAL)
-    @pytest.mark.parametrize("payload", [
-        {"password": "test_password", "firstName": "test_name"},  # Нет login
-        {"login": "test_login", "firstName": "test_name"},      # Нет password
-        {"login": "test_login", "password": "test_password"}   # Нет firstName
+    @pytest.mark.parametrize("missing_field", [
+        "login",  # Нет login
+        "password",  # Нет password
+        "firstName"  # Нет firstName
     ])
-    def test_create_courier_missing_required_fields_fails(self, payload):
+    def test_create_courier_missing_required_fields_fails(self, missing_field):
         generator = CourierGenerator()
-        if "login" not in payload:
-            payload["login"] = generator.generate_random_string(10)
-        if "password" not in payload:
-            payload["password"] = generator.generate_random_string(10)
+        base_payload = {
+            "login": generator.generate_random_string(10),
+            "password": generator.generate_random_string(10),
+            "firstName": generator.generate_random_string(10)
+        }
+        test_payload = base_payload.copy()
+        del test_payload[missing_field] # Удаляем требуемое поле
 
-        with allure.step(f'Попытка создать курьера с неполными данными: {payload}'):
-            response = requests.post(CREATE_COURIER, data=payload)
+        with allure.step(f'Попытка создать курьера без поля "{missing_field}"'):
+            response = requests.post(CREATE_COURIER, data=test_payload)
 
         with allure.step('Проверка статуса ответа на неполные данные'):
             assert response.status_code == 400
         with allure.step('Проверка сообщения об ошибке'):
             assert response.json().get('message') == "Недостаточно данных для создания учетной записи"
 
+
     @allure.title('Успешный запрос создания курьера возвращает {"ok":true}')
     @allure.description('Проверяем содержание ответа при успешном создании курьера')
-    def test_create_courier_returns_ok_true(self, register_and_delete_courier):
-        generator = CourierGenerator()
-        login = generator.generate_random_string(10)
-        password = generator.generate_random_string(10)
-        first_name = generator.generate_random_string(10)
+    def test_create_courier_returns_ok_true(self, generate_courier_data_and_cleanup):
+        
+        login = generate_courier_data_and_cleanup['login']
+        password = generate_courier_data_and_cleanup['password']
+        first_name = generate_courier_data_and_cleanup['firstName']
 
         payload = {
             "login": login,
@@ -82,18 +86,14 @@ class TestCourierCreation:
             "firstName": first_name
         }
 
-        response = requests.post(CREATE_COURIER, data=payload)
+        with allure.step('Отправка запроса на создание курьера'):
+            response = requests.post(CREATE_COURIER, data=payload)
 
         with allure.step('Проверка статуса ответа'):
             assert response.status_code == 201
         with allure.step('Проверка тела ответа на {"ok":true}'):
             assert response.json() == {"ok": True}
 
-        login_payload = {"login": login, "password": password}
-        login_response = requests.post(LOGIN_COURIER, data=login_payload)
-        if login_response.status_code == 200 and 'id' in login_response.json():
-            courier_id = login_response.json()['id']
-            requests.delete(f"{DELETE_COURIER}{courier_id}")
 
 
 
