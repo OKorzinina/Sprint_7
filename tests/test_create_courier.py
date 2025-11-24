@@ -9,19 +9,46 @@ from endpoints import CREATE_COURIER, LOGIN_COURIER, DELETE_COURIER
 class TestCourierCreation:
 
     @allure.title('Успешное создание курьера')
-    @allure.description('Проверяем, что нового курьера можно создать с корректными данными')
+    #@allure.description('Проверяем, что нового курьера можно создать с корректными данными')
+    #def test_create_courier_success(self, register_and_delete_courier):
+        #login = register_and_delete_courier['login']
+        #password = register_and_delete_courier['password']
+
+        #login_payload = {
+            #"login": login,
+            #"password": password
+        #}
+        #login_response = requests.post(LOGIN_COURIER, data=login_payload)
+
+        #with allure.step('Проверка статуса ответа логина'):
+            #assert login_response.status_code == 200
+    @allure.title('Невозможно создать существующего курьера')
+    @allure.description('Проверяем, что система не позволяет создать курьера с уже существующим логином.')
     def test_create_courier_success(self, register_and_delete_courier):
         login = register_and_delete_courier['login']
         password = register_and_delete_courier['password']
+        first_name = register_and_delete_courier['firstName']
 
-        login_payload = {
+        # Попытка создать курьера с существующим логином и паролем.
+        payload = {
             "login": login,
-            "password": password
+            "password": password,
+            "firstName": first_name  # Добавлен firstName для полноты данных
         }
-        login_response = requests.post(LOGIN_COURIER, data=login_payload)
 
-        with allure.step('Проверка статуса ответа логина'):
-            assert login_response.status_code == 200
+        with allure.step('Попытка создать существующего курьера'):
+            response = requests.post(CREATE_COURIER, data=payload)
+
+        with allure.step('Проверка статуса ответа - должен быть конфликт (409)'):
+            assert response.status_code == 409
+
+        with allure.step('Проверка сообщения об ошибке'):
+            assert response.json().get('message') == "Этот логин уже используется. Попробуйте другой."
+
+#
+
+
+    
         with allure.step('Проверка наличия ID в ответе логина'):
             assert 'id' in login_response.json()
             assert login_response.json().get('id') is not None
